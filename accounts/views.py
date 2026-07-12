@@ -58,10 +58,11 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        logout(request)
+        if request.user.is_authenticated:
+            logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
