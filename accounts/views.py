@@ -66,9 +66,11 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({"user": None})
         return Response({"user": UserSerializer(request.user).data})
 
 

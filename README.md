@@ -69,10 +69,9 @@ DATABASE_URL=<render-postgres-internal-url>
 DJANGO_MEDIA_ROOT=/var/data/media
 DJANGO_SESSION_COOKIE_SECURE=True
 DJANGO_CSRF_COOKIE_SECURE=True
+DJANGO_SUPERUSER_EMAIL=<admin-email>
+DJANGO_SUPERUSER_USERNAME=<admin-username-or-email>
+DJANGO_SUPERUSER_PASSWORD=<admin-password>
 ```
 
-After the first deploy, create the admin user from Render Shell:
-
-```bash
-python manage.py createsuperuser
-```
+The deploy build runs `python manage.py ensure_superuser`, so Render will create or update the admin account automatically when the `DJANGO_SUPERUSER_*` variables are set.
