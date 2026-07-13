@@ -4,7 +4,6 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from unittest.mock import patch
 import json
-import types
 
 from .models import NewsletterSubscription
 
@@ -119,30 +118,3 @@ class ContactApiTests(TestCase):
         self.assertEqual(payload["to"], ["reader@example.com"])
         self.assertIn("Welcome to the Danajet Network", payload["subject"])
         self.assertEqual(request.headers["Authorization"], "Bearer test-resend-key")
-
-    @override_settings(
-        NEWSLETTER_EMAIL_ASYNC=False,
-        RESEND_API_KEY="test-resend-key",
-        RESEND_FROM_EMAIL="Danajet <onboarding@resend.dev>",
-        RESEND_API_URL="https://api.resend.com/emails",
-        EMAIL_TIMEOUT=10,
-    )
-    @patch.dict("sys.modules", {"resend": types.SimpleNamespace(api_key="", Emails=types.SimpleNamespace(send=None))})
-    def test_public_newsletter_subscription_uses_resend_package_when_available(self):
-        import sys
-
-        sent_payloads = []
-        sys.modules["resend"].Emails.send = sent_payloads.append
-
-        response = self.client.post(
-            "/api/newsletter-subscriptions/",
-            {"email": "reader@example.com", "source": "Footer newsletter"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(sys.modules["resend"].api_key, "test-resend-key")
-        self.assertEqual(len(sent_payloads), 1)
-        self.assertEqual(sent_payloads[0]["from"], "Danajet <onboarding@resend.dev>")
-        self.assertEqual(sent_payloads[0]["to"], "reader@example.com")
-        self.assertIn("Welcome to the Danajet Network", sent_payloads[0]["subject"])

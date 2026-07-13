@@ -20,24 +20,6 @@ def queue_newsletter_welcome_email(subscription):
 
 
 def _send_with_resend_api(subject, text_body, html_body, to_email):
-    try:
-        import resend
-    except ImportError:
-        resend = None
-
-    if resend is not None:
-        resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send(
-            {
-                "from": settings.RESEND_FROM_EMAIL,
-                "to": to_email,
-                "subject": subject,
-                "html": html_body,
-                "text": text_body,
-            }
-        )
-        return
-
     payload = json.dumps(
         {
             "from": settings.RESEND_FROM_EMAIL,
@@ -59,7 +41,8 @@ def _send_with_resend_api(subject, text_body, html_body, to_email):
 
     try:
         with urlrequest.urlopen(request, timeout=settings.EMAIL_TIMEOUT) as response:
-            response.read()
+            body = response.read().decode("utf-8", errors="replace")
+            logger.info("Newsletter welcome email sent to %s via Resend API: %s", to_email, body)
     except urlerror.HTTPError as error:
         body = error.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Resend API returned {error.code}: {body}") from error

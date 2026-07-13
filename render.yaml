@@ -68,7 +68,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
-        value: Danajet <onboarding@resend.dev>
+        value: onboarding@resend.dev
       - key: RESEND_API_URL
         value: https://api.resend.com/emails
       - key: MEDIA_UPLOAD_MAX_MB
