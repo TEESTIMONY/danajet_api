@@ -5,6 +5,8 @@ from rest_framework.test import APIClient
 from unittest.mock import patch
 import json
 
+from .models import NewsletterSubscription
+
 
 class ContactApiTests(TestCase):
     def setUp(self):
@@ -62,6 +64,34 @@ class ContactApiTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["reader@example.com"])
         self.assertIn("Welcome to the Danajet Network", mail.outbox[0].subject)
         self.assertIn("book resources", mail.outbox[0].body)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="admin@danajet.com",
+        NEWSLETTER_EMAIL_ASYNC=False,
+        RESEND_API_KEY="",
+    )
+    def test_existing_newsletter_email_can_subscribe_again(self):
+        NewsletterSubscription.objects.create(
+            email="reader@example.com",
+            source="Old popup",
+            is_active=False,
+        )
+
+        response = self.client.post(
+            "/api/newsletter-subscriptions/",
+            {"email": "READER@example.com", "source": "Footer newsletter"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(NewsletterSubscription.objects.count(), 1)
+        subscription = NewsletterSubscription.objects.get()
+        self.assertEqual(subscription.email, "reader@example.com")
+        self.assertEqual(subscription.source, "Footer newsletter")
+        self.assertTrue(subscription.is_active)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["reader@example.com"])
 
     @override_settings(
         NEWSLETTER_EMAIL_ASYNC=False,

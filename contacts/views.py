@@ -1,4 +1,5 @@
-from rest_framework import mixins, permissions, viewsets
+from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.response import Response
 
 from .models import ContactMessage, NewsletterSubscription, ProjectRequest, TransportWaitlist
 from .emails import queue_newsletter_welcome_email
@@ -59,6 +60,22 @@ class NewsletterSubscriptionViewSet(PublicCreateStaffManageViewSet):
     filterset_fields = ["source", "is_active"]
     search_fields = ["name", "email", "source"]
     ordering_fields = ["created_at", "updated_at"]
+
+    def create(self, request, *args, **kwargs):
+        email = str(request.data.get("email", "")).strip().lower()
+        if email:
+            existing = NewsletterSubscription.objects.filter(email__iexact=email).first()
+            if existing:
+                existing.email = email
+                existing.name = request.data.get("name", existing.name) or existing.name
+                existing.source = request.data.get("source", existing.source) or existing.source
+                existing.is_active = True
+                existing.save(update_fields=["email", "name", "source", "is_active", "updated_at"])
+                queue_newsletter_welcome_email(existing)
+                serializer = self.get_serializer(existing)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         super().perform_create(serializer)
