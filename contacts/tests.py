@@ -118,3 +118,5 @@ class ContactApiTests(TestCase):
         self.assertEqual(payload["to"], ["reader@example.com"])
         self.assertIn("Welcome to the Danajet Network", payload["subject"])
         self.assertEqual(request.headers["Authorization"], "Bearer test-resend-key")
+        self.assertEqual(request.headers["Accept"], "application/json")
+        self.assertIn("Danajet API", request.headers["User-agent"])

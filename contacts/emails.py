@@ -34,8 +34,10 @@ def _send_with_resend_api(subject, text_body, html_body, to_email):
         data=payload,
         method="POST",
         headers={
+            "Accept": "application/json",
             "Authorization": f"Bearer {settings.RESEND_API_KEY}",
             "Content-Type": "application/json",
+            "User-Agent": "Danajet API/1.0 (https://danajet-api.onrender.com)",
         },
     )
 
