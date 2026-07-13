@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 
@@ -39,3 +40,21 @@ class ContactApiTests(TestCase):
         response = self.client.get("/api/project-requests/")
 
         self.assertEqual(response.status_code, 200)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="admin@danajet.com",
+    )
+    def test_public_newsletter_subscription_sends_welcome_email(self):
+        response = self.client.post(
+            "/api/newsletter-subscriptions/",
+            {"email": "reader@example.com", "source": "Footer newsletter"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].from_email, "admin@danajet.com")
+        self.assertEqual(mail.outbox[0].to, ["reader@example.com"])
+        self.assertIn("Welcome to the Danajet Network", mail.outbox[0].subject)
+        self.assertIn("book resources", mail.outbox[0].body)
