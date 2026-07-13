@@ -1,5 +1,8 @@
 import logging
+import json
 from threading import Thread
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -14,6 +17,40 @@ def queue_newsletter_welcome_email(subscription):
         return
 
     Thread(target=send_newsletter_welcome_email, args=(subscription,), daemon=True).start()
+
+
+def _send_with_resend_api(subject, text_body, html_body, to_email):
+    payload = json.dumps(
+        {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+            "text": text_body,
+        }
+    ).encode("utf-8")
+    request = urlrequest.Request(
+        settings.RESEND_API_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urlrequest.urlopen(request, timeout=settings.EMAIL_TIMEOUT) as response:
+            response.read()
+    except urlerror.HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Resend API returned {error.code}: {body}") from error
+
+
+def _send_with_django_email(subject, text_body, html_body, to_email):
+    message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
+    message.attach_alternative(html_body, "text/html")
+    message.send(fail_silently=False)
 
 
 def send_newsletter_welcome_email(subscription):
@@ -56,8 +93,9 @@ def send_newsletter_welcome_email(subscription):
     """
 
     try:
-        message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
-        message.attach_alternative(html_body, "text/html")
-        message.send(fail_silently=False)
+        if settings.RESEND_API_KEY:
+            _send_with_resend_api(subject, text_body, html_body, to_email)
+        else:
+            _send_with_django_email(subject, text_body, html_body, to_email)
     except Exception:
         logger.exception("Newsletter welcome email could not be sent to %s", subscription.email)

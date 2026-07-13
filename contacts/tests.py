@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+from unittest.mock import patch
+import json
 
 
 class ContactApiTests(TestCase):
@@ -45,6 +47,7 @@ class ContactApiTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="admin@danajet.com",
         NEWSLETTER_EMAIL_ASYNC=False,
+        RESEND_API_KEY="",
     )
     def test_public_newsletter_subscription_sends_welcome_email(self):
         response = self.client.post(
@@ -59,3 +62,29 @@ class ContactApiTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["reader@example.com"])
         self.assertIn("Welcome to the Danajet Network", mail.outbox[0].subject)
         self.assertIn("book resources", mail.outbox[0].body)
+
+    @override_settings(
+        NEWSLETTER_EMAIL_ASYNC=False,
+        RESEND_API_KEY="test-resend-key",
+        RESEND_FROM_EMAIL="Danajet <onboarding@resend.dev>",
+        RESEND_API_URL="https://api.resend.com/emails",
+        EMAIL_TIMEOUT=10,
+    )
+    @patch("contacts.emails.urlrequest.urlopen")
+    def test_public_newsletter_subscription_sends_with_resend_api(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = b'{"id":"email_123"}'
+
+        response = self.client.post(
+            "/api/newsletter-subscriptions/",
+            {"email": "reader@example.com", "source": "Popup newsletter"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mock_urlopen.assert_called_once()
+        request = mock_urlopen.call_args.args[0]
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(payload["from"], "Danajet <onboarding@resend.dev>")
+        self.assertEqual(payload["to"], ["reader@example.com"])
+        self.assertIn("Welcome to the Danajet Network", payload["subject"])
+        self.assertEqual(request.headers["Authorization"], "Bearer test-resend-key")

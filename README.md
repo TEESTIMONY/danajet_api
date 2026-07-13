@@ -76,6 +76,9 @@ DJANGO_EMAIL_USE_TLS=True
 DJANGO_EMAIL_USE_SSL=False
 DJANGO_EMAIL_TIMEOUT=10
 NEWSLETTER_EMAIL_ASYNC=True
+RESEND_API_KEY=<resend-api-key>
+RESEND_FROM_EMAIL=Danajet <onboarding@resend.dev>
+RESEND_API_URL=https://api.resend.com/emails
 SUPABASE_STORAGE_ENABLED=True
 SUPABASE_STORAGE_BUCKET=danajet-media
 SUPABASE_STORAGE_ENDPOINT=https://<project-ref>.supabase.co/storage/v1/s3
@@ -102,4 +105,4 @@ For Supabase on Render, use the Session Pooler connection string in `DATABASE_UR
 
 For Supabase Storage, create a public bucket such as `danajet-media`, then create S3 access keys in Supabase Storage settings. The API optimizes uploaded images before saving them: images are resized to fit within `MEDIA_IMAGE_MAX_WIDTH` x `MEDIA_IMAGE_MAX_HEIGHT`, converted to WebP, and saved at `MEDIA_IMAGE_QUALITY`. Videos are not compressed by Django, so keep short intro videos small and use a dedicated video host later for full course lessons.
 
-For newsletter welcome emails, Resend SMTP is used through Django's email backend. Set `DJANGO_EMAIL_HOST_PASSWORD` to your Resend API key, keep `DJANGO_EMAIL_HOST_USER=resend`, and set `DJANGO_DEFAULT_FROM_EMAIL` to a verified Resend sender/domain. When someone subscribes from the footer or popup, Django saves the subscription and sends a professional welcome email from this sender.
+For newsletter welcome emails, Resend API is used when `RESEND_API_KEY` is set. Set `RESEND_FROM_EMAIL` to `Danajet <onboarding@resend.dev>` for first tests, then switch to a verified branded sender/domain later. If `RESEND_API_KEY` is missing, Django falls back to the SMTP settings above. When someone subscribes from the footer or popup, Django saves the subscription immediately and sends the welcome email in the background.
