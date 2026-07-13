@@ -55,8 +55,8 @@ Recommended Render settings if creating manually:
 - Build command: `bash build.sh`
 - Start command: `gunicorn danajet_api.wsgi:application`
 - Health check path: `/api/health/`
-- Add a PostgreSQL database and set `DATABASE_URL` from its internal connection string.
-- Add a persistent disk mounted at `/var/data` and set `DJANGO_MEDIA_ROOT=/var/data/media` so uploaded files persist.
+- Create a Supabase Postgres project and set `DATABASE_URL` from its connection string.
+- Create a Supabase Storage bucket and set the `SUPABASE_STORAGE_*` variables so uploaded files persist outside Render.
 
 Required environment variables:
 
@@ -65,8 +65,18 @@ DJANGO_DEBUG=False
 DJANGO_SECRET_KEY=<generate a strong secret>
 DJANGO_ALLOWED_HOSTS=<your-render-service>.onrender.com
 DJANGO_CORS_ALLOWED_ORIGINS=<your-frontend-origin>
-DATABASE_URL=<render-postgres-internal-url>
-DJANGO_MEDIA_ROOT=/var/data/media
+DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
+SUPABASE_STORAGE_ENABLED=True
+SUPABASE_STORAGE_BUCKET=danajet-media
+SUPABASE_STORAGE_ENDPOINT=https://<project-ref>.supabase.co/storage/v1/s3
+SUPABASE_STORAGE_PUBLIC_URL=https://<project-ref>.supabase.co/storage/v1/object/public/danajet-media
+SUPABASE_STORAGE_ACCESS_KEY_ID=<supabase-storage-s3-access-key>
+SUPABASE_STORAGE_SECRET_ACCESS_KEY=<supabase-storage-s3-secret-key>
+SUPABASE_STORAGE_REGION=us-east-1
+MEDIA_UPLOAD_MAX_MB=100
+MEDIA_IMAGE_MAX_WIDTH=1800
+MEDIA_IMAGE_MAX_HEIGHT=1800
+MEDIA_IMAGE_QUALITY=82
 DJANGO_SESSION_COOKIE_SECURE=True
 DJANGO_CSRF_COOKIE_SECURE=True
 DJANGO_SESSION_COOKIE_SAMESITE=None
@@ -77,3 +87,7 @@ DJANGO_SUPERUSER_PASSWORD=<admin-password>
 ```
 
 The deploy build runs `python manage.py ensure_superuser`, so Render will create or update the admin account automatically when the `DJANGO_SUPERUSER_*` variables are set.
+
+For Supabase, use the project database password in `DATABASE_URL` and keep `?sslmode=require` at the end of the URL. Render still hosts the Django API; Supabase only provides the Postgres database.
+
+For Supabase Storage, create a public bucket such as `danajet-media`, then create S3 access keys in Supabase Storage settings. The API optimizes uploaded images before saving them: images are resized to fit within `MEDIA_IMAGE_MAX_WIDTH` x `MEDIA_IMAGE_MAX_HEIGHT`, converted to WebP, and saved at `MEDIA_IMAGE_QUALITY`. Videos are not compressed by Django, so keep short intro videos small and use a dedicated video host later for full course lessons.

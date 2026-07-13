@@ -32,14 +32,26 @@ services:
       - key: DJANGO_CSRF_COOKIE_SAMESITE
         value: None
       - key: DATABASE_URL
-        fromDatabase:
-          name: danajet-db
-          property: connectionString
-    disk:
-      name: danajet-media
-      mountPath: /var/data
-      sizeGB: 1
-
-databases:
-  - name: danajet-db
-    plan: basic-256mb
+        sync: false
+      - key: SUPABASE_STORAGE_ENABLED
+        value: "True"
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: SUPABASE_STORAGE_ENDPOINT
+        sync: false
+      - key: SUPABASE_STORAGE_PUBLIC_URL
+        sync: false
+      - key: SUPABASE_STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_REGION
+        value: us-east-1
+      - key: MEDIA_UPLOAD_MAX_MB
+        value: "100"
+      - key: MEDIA_IMAGE_MAX_WIDTH
+        value: "1800"
+      - key: MEDIA_IMAGE_MAX_HEIGHT
+        value: "1800"
+      - key: MEDIA_IMAGE_QUALITY
+        value: "82"

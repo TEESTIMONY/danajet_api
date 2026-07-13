@@ -1,4 +1,5 @@
 from pathlib import Path
+from importlib.util import find_spec
 import os
 
 import dj_database_url
@@ -36,7 +37,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -85,9 +85,43 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_AVAILABLE = find_spec("whitenoise") is not None
+if WHITENOISE_AVAILABLE:
+    MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
+MEDIA_UPLOAD_MAX_MB = int(os.getenv("MEDIA_UPLOAD_MAX_MB", "100"))
+MEDIA_UPLOAD_MAX_BYTES = MEDIA_UPLOAD_MAX_MB * 1024 * 1024
+MEDIA_IMAGE_MAX_WIDTH = int(os.getenv("MEDIA_IMAGE_MAX_WIDTH", "1800"))
+MEDIA_IMAGE_MAX_HEIGHT = int(os.getenv("MEDIA_IMAGE_MAX_HEIGHT", "1800"))
+MEDIA_IMAGE_QUALITY = int(os.getenv("MEDIA_IMAGE_QUALITY", "82"))
+
+SUPABASE_STORAGE_ENABLED = os.getenv("SUPABASE_STORAGE_ENABLED", "False").lower() == "true"
+SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "")
+SUPABASE_STORAGE_PUBLIC_URL = os.getenv("SUPABASE_STORAGE_PUBLIC_URL", "").rstrip("/")
+
+if SUPABASE_STORAGE_ENABLED:
+    INSTALLED_APPS.append("storages")
+    AWS_ACCESS_KEY_ID = os.getenv("SUPABASE_STORAGE_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = os.getenv("SUPABASE_STORAGE_SECRET_ACCESS_KEY", "")
+    AWS_STORAGE_BUCKET_NAME = SUPABASE_STORAGE_BUCKET
+    AWS_S3_ENDPOINT_URL = os.getenv("SUPABASE_STORAGE_ENDPOINT", "")
+    AWS_S3_REGION_NAME = os.getenv("SUPABASE_STORAGE_REGION", "us-east-1")
+    AWS_S3_ADDRESSING_STYLE = "path"
+    AWS_QUERYSTRING_AUTH = False
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+        },
+    }
+    if WHITENOISE_AVAILABLE:
+        STORAGES["staticfiles"] = {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        }
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = os.getenv("DJANGO_SESSION_COOKIE_SECURE", "False").lower() == "true"
