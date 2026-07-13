@@ -47,6 +47,24 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_REGION
         value: us-east-1
+      - key: DJANGO_EMAIL_HOST
+        value: smtp.resend.com
+      - key: DJANGO_EMAIL_PORT
+        value: "587"
+      - key: DJANGO_EMAIL_HOST_USER
+        value: resend
+      - key: DJANGO_EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DJANGO_DEFAULT_FROM_EMAIL
+        sync: false
+      - key: DJANGO_EMAIL_USE_TLS
+        value: "True"
+      - key: DJANGO_EMAIL_USE_SSL
+        value: "False"
+      - key: DJANGO_EMAIL_TIMEOUT
+        value: "10"
+      - key: NEWSLETTER_EMAIL_ASYNC
+        value: "True"
       - key: MEDIA_UPLOAD_MAX_MB
         value: "100"
       - key: MEDIA_IMAGE_MAX_WIDTH

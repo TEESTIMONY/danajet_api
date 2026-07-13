@@ -1,10 +1,19 @@
 import logging
+from threading import Thread
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
 
 logger = logging.getLogger(__name__)
+
+
+def queue_newsletter_welcome_email(subscription):
+    if not getattr(settings, "NEWSLETTER_EMAIL_ASYNC", True):
+        send_newsletter_welcome_email(subscription)
+        return
+
+    Thread(target=send_newsletter_welcome_email, args=(subscription,), daemon=True).start()
 
 
 def send_newsletter_welcome_email(subscription):

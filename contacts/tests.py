@@ -44,6 +44,7 @@ class ContactApiTests(TestCase):
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="admin@danajet.com",
+        NEWSLETTER_EMAIL_ASYNC=False,
     )
     def test_public_newsletter_subscription_sends_welcome_email(self):
         response = self.client.post(

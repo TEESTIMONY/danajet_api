@@ -1,7 +1,7 @@
 from rest_framework import mixins, permissions, viewsets
 
 from .models import ContactMessage, NewsletterSubscription, ProjectRequest, TransportWaitlist
-from .emails import send_newsletter_welcome_email
+from .emails import queue_newsletter_welcome_email
 from .serializers import (
     ContactMessageSerializer,
     NewsletterSubscriptionSerializer,
@@ -62,7 +62,7 @@ class NewsletterSubscriptionViewSet(PublicCreateStaffManageViewSet):
 
     def perform_create(self, serializer):
         super().perform_create(serializer)
-        send_newsletter_welcome_email(serializer.instance)
+        queue_newsletter_welcome_email(serializer.instance)
 
 
 class TransportWaitlistViewSet(PublicCreateStaffManageViewSet):
