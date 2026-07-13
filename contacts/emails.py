@@ -20,6 +20,24 @@ def queue_newsletter_welcome_email(subscription):
 
 
 def _send_with_resend_api(subject, text_body, html_body, to_email):
+    try:
+        import resend
+    except ImportError:
+        resend = None
+
+    if resend is not None:
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send(
+            {
+                "from": settings.RESEND_FROM_EMAIL,
+                "to": to_email,
+                "subject": subject,
+                "html": html_body,
+                "text": text_body,
+            }
+        )
+        return
+
     payload = json.dumps(
         {
             "from": settings.RESEND_FROM_EMAIL,
