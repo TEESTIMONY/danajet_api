@@ -19,6 +19,10 @@ def queue_newsletter_welcome_email(subscription):
     Thread(target=send_newsletter_welcome_email, args=(subscription,), daemon=True).start()
 
 
+def queue_free_resource_email(subscription, course):
+    Thread(target=send_free_resource_email, args=(subscription, course), daemon=True).start()
+
+
 def _send_with_resend_api(subject, text_body, html_body, to_email):
     payload = json.dumps(
         {
@@ -102,3 +106,35 @@ def send_newsletter_welcome_email(subscription):
             _send_with_django_email(subject, text_body, html_body, to_email)
     except Exception:
         logger.exception("Newsletter welcome email could not be sent to %s", subscription.email)
+
+
+def send_free_resource_email(subscription, course):
+    if not subscription.email or not course.access_url:
+        return
+
+    subject = f"Your Danajet download: {course.title}"
+    text_body = (
+        f"Hello {subscription.name or 'there'},\n\n"
+        f"Your free resource, {course.title}, is ready.\n\n"
+        f"Download it here: {course.access_url}\n\n"
+        "Thank you for downloading this free resource. We hope it helps you on your publishing journey.\n\n"
+        "The Danajet Team"
+    )
+    html_body = f"""
+    <div style="margin:0;background:#f6f1e9;padding:32px 18px;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+      <div style="max-width:620px;margin:0 auto;background:#fff;padding:36px;border-top:5px solid #ef450b;">
+        <p style="margin:0 0 12px;color:#ef450b;font-size:12px;font-weight:800;text-transform:uppercase;">Danajet Free Resource</p>
+        <h1 style="margin:0 0 18px;font-size:32px;line-height:1.05;">Your download is ready!</h1>
+        <p style="font-size:16px;line-height:1.65;">Your copy of <strong>{course.title}</strong> is ready. Use the button below to download it now or return to it later.</p>
+        <p style="margin:26px 0;"><a href="{course.access_url}" style="display:inline-block;padding:14px 20px;background:#ef450b;color:#fff;text-decoration:none;font-weight:800;">Download Resource</a></p>
+        <p style="font-size:15px;line-height:1.65;color:#59534d;">Thank you for downloading this free resource. We hope it helps you on your publishing journey.</p>
+      </div>
+    </div>
+    """
+    try:
+        if settings.RESEND_API_KEY:
+            _send_with_resend_api(subject, text_body, html_body, subscription.email)
+        else:
+            _send_with_django_email(subject, text_body, html_body, subscription.email)
+    except Exception:
+        logger.exception("Free resource email could not be sent to %s", subscription.email)

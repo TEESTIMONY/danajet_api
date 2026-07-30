@@ -7,6 +7,7 @@ from catalog.models import Course, Product
 from catalog.serializers import CourseSerializer, ProductSerializer
 
 from .models import Cart, CartItem, Coupon, CourseEnrollment, Order, OrderItem, Payment, ShippingRate
+from .emails import queue_order_emails
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -106,6 +107,13 @@ class CheckoutSerializer(serializers.Serializer):
     cart_session_key = serializers.CharField(required=False, allow_blank=True)
     shipping_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=Decimal("0.00"))
     tax_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=Decimal("0.00"))
+    payment_method = serializers.ChoiceField(
+        choices=Order.PAYMENT_METHOD_CHOICES,
+        required=False,
+        default="international_request",
+    )
+    display_currency = serializers.CharField(max_length=10, required=False, default="USD")
+    display_total = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, default=Decimal("0.00"))
 
     def validate_cart(self, value):
         request = self.context.get("request")
@@ -176,6 +184,15 @@ class CheckoutSerializer(serializers.Serializer):
             if coupon:
                 coupon.used_count += 1
                 coupon.save(update_fields=["used_count", "updated_at"])
+            Payment.objects.create(
+                order=order,
+                provider=order.payment_method,
+                amount=order.total,
+                currency=order.currency,
+                status="pending",
+                metadata={"display_currency": order.display_currency, "display_total": str(order.display_total)},
+            )
+            transaction.on_commit(lambda: queue_order_emails(order.pk))
         return order
 
 

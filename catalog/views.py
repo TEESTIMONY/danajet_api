@@ -1,4 +1,11 @@
-from rest_framework import permissions, viewsets
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from contacts.emails import queue_free_resource_email
+from contacts.models import NewsletterSubscription
 
 from .models import BlogPost, Brand, Category, Course, PortfolioProject, Product, Review, Service
 from .serializers import (
@@ -61,6 +68,26 @@ class CourseViewSet(PublicContentViewSet):
     filterset_fields = ["category", "category_ref", "status", "featured", "level"]
     search_fields = ["title", "subtitle", "summary"]
     ordering_fields = ["display_order", "title", "price", "created_at"]
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.AllowAny], url_path="request-download")
+    def request_download(self, request, slug=None):
+        course = self.get_object()
+        if course.category != "Templates & Resources" or course.status.lower() != "available now" or not course.access_url:
+            return Response({"detail": "This resource is not available for download yet."}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = str(request.data.get("email", "")).strip().lower()
+        name = str(request.data.get("name", "")).strip()
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({"email": ["Enter a valid email address."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        subscription, _ = NewsletterSubscription.objects.update_or_create(
+            email=email,
+            defaults={"name": name, "source": f"Free resource: {course.title}", "is_active": True},
+        )
+        queue_free_resource_email(subscription, course)
+        return Response({"download_url": course.access_url, "message": "Your download is ready."})
 
 
 class PortfolioProjectViewSet(PublicContentViewSet):

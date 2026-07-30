@@ -20,7 +20,7 @@ SHOP_CATEGORIES = [
 
 BRANDS = [
     {"slug": "danajet-booklab", "name": "BookLab", "code": "DL", "summary": "Book design, formatting & publishing", "href": "/request-project", "icon": "book-open"},
-    {"slug": "danajet-media", "name": "Media", "code": "DM", "summary": "Storytelling, YouTube & content", "href": "/request-project", "icon": "play"},
+    {"slug": "danajet-media", "name": "Media", "code": "DM", "summary": "Storytelling, YouTube & content", "href": "/media", "icon": "play"},
     {"slug": "danajet-academy", "name": "Academy", "code": "DA", "summary": "Courses & learning resources", "href": "/courses", "icon": "layers"},
     {"slug": "danajet-transport", "name": "Transport", "code": "DT", "summary": "A future-facing transport vision", "href": "/transport", "icon": "plane"},
 ]
@@ -173,13 +173,14 @@ ABOUT_SETTINGS = {
 
 CONTACT_SETTINGS = {
     "email": "hello@danajet.com",
-    "whatsapp": "+1 000 000 0000",
+    "whatsapp": "https://wa.me/2348103691930",
     "businessHours": "Monday - Friday, 9:00 AM - 5:00 PM",
     "location": "Remote, serving authors worldwide",
-    "youtube": "#youtube",
-    "instagram": "#instagram",
-    "tiktok": "#tiktok",
-    "linkedin": "#linkedin",
+    "youtube": "/media",
+    "facebook": "https://www.facebook.com/share/g/19Bijsrav6/",
+    "instagram": "https://www.instagram.com/thedanajet",
+    "tiktok": "https://www.tiktok.com/@danajetbooklab",
+    "linkedin": "https://www.linkedin.com/in/ajetunmobi-daniel",
     "footerCopy": "Helping authors create, publish, and share professional books while building educational resources, creative media, and future innovations.",
 }
 
@@ -396,6 +397,7 @@ COURSE_GROUPS = [
         "A+ Content Planning Template",
         "Book Launch Planner",
         "Children's Book Planning Workbook",
+        "Free AI YouTube Video Workflow Checklist (A Simple Step-by-Step Roadmap from Script Creation to Final Video Export)",
     ]),
 ]
 

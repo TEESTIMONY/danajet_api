@@ -121,6 +121,11 @@ class Order(TimestampedModel):
         ("failed", "Failed"),
         ("refunded", "Refunded"),
     ]
+    PAYMENT_METHOD_CHOICES = [
+        ("bank_transfer_ng", "Nigerian Bank Transfer"),
+        ("international_request", "International Payment Request"),
+        ("online_card", "Online Card Payment"),
+    ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, related_name="orders")
     cart = models.ForeignKey(Cart, on_delete=models.SET_NULL, blank=True, null=True, related_name="orders")
@@ -141,6 +146,9 @@ class Order(TimestampedModel):
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, blank=True, null=True, related_name="orders")
     status = models.CharField(max_length=40, choices=STATUS_CHOICES, default="pending")
     payment_status = models.CharField(max_length=40, choices=PAYMENT_STATUS_CHOICES, default="unpaid")
+    payment_method = models.CharField(max_length=40, choices=PAYMENT_METHOD_CHOICES, default="international_request")
+    display_currency = models.CharField(max_length=10, default="USD")
+    display_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
