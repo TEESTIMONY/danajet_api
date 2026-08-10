@@ -6,3 +6,4 @@ python manage.py collectstatic --no-input
 python manage.py migrate
 python manage.py ensure_superuser
 python manage.py seed_catalog --only-empty
+python manage.py import_blog_collection danajet_blog_collection.txt
