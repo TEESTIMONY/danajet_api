@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from contacts.emails import queue_free_resource_email
 from contacts.models import NewsletterSubscription
@@ -65,11 +66,19 @@ class ProductViewSet(PublicContentViewSet):
 class CourseViewSet(PublicContentViewSet):
     queryset = Course.objects.select_related("category_ref")
     serializer_class = CourseSerializer
+    throttle_scope = None
     filterset_fields = ["category", "category_ref", "status", "featured", "level"]
     search_fields = ["title", "subtitle", "summary"]
     ordering_fields = ["display_order", "title", "price", "created_at"]
 
-    @action(detail=True, methods=["post"], permission_classes=[permissions.AllowAny], url_path="request-download")
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.AllowAny],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="free_resource_download",
+        url_path="request-download",
+    )
     def request_download(self, request, slug=None):
         course = self.get_object()
         if course.category != "Templates & Resources" or course.status.lower() != "available now" or not course.access_url:

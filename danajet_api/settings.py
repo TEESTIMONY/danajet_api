@@ -11,8 +11,18 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+if not DEBUG and SECRET_KEY == "unsafe-dev-secret-key":
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY is not set. Refusing to start with the default development "
+        "secret key while DJANGO_DEBUG=False."
+    )
 ADMIN_EMAIL = os.getenv("DJANGO_ADMIN_EMAIL", "hello@danajet.com")
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", ADMIN_EMAIL)
+ADMIN_NOTIFICATION_EMAILS = [
+    email.strip()
+    for email in os.getenv("DJANGO_ADMIN_NOTIFICATION_EMAILS", f"{ADMIN_EMAIL},testimonyalade82@gmail.com").split(",")
+    if email.strip()
+]
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
@@ -39,6 +49,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "danajet_api.middleware.AdminLoginThrottleMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -144,6 +155,10 @@ SESSION_COOKIE_SECURE = os.getenv("DJANGO_SESSION_COOKIE_SECURE", "False").lower
 CSRF_COOKIE_SECURE = os.getenv("DJANGO_CSRF_COOKIE_SECURE", "False").lower() == "true"
 SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "None" if SESSION_COOKIE_SECURE else "Lax")
 CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "None" if CSRF_COOKIE_SECURE else "Lax")
+SECURE_SSL_REDIRECT = os.getenv("DJANGO_SECURE_SSL_REDIRECT", "False").lower() == "true"
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -173,4 +188,14 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_THROTTLE_RATES": {
+        "checkout": "15/hour",
+        "receipt_upload": "20/hour",
+        "lead_form": "20/hour",
+        "auth_login": "15/hour",
+        "auth_register": "10/hour",
+        "free_resource_download": "20/hour",
+        "coupon_validate": "20/hour",
+        "cart_write": "300/hour",
+    },
 }

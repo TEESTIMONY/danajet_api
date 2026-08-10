@@ -1,3 +1,4 @@
+import secrets
 from decimal import Decimal
 
 from django.conf import settings
@@ -150,14 +151,25 @@ class Order(TimestampedModel):
     display_currency = models.CharField(max_length=10, default="USD")
     display_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     metadata = models.JSONField(default=dict, blank=True)
+    receipt = models.FileField(upload_to="order_receipts/", blank=True, null=True)
+    receipt_uploaded_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
         if not self.order_number:
-            last_id = (Order.objects.order_by("-id").values_list("id", flat=True).first() or 0) + 1
-            self.order_number = f"DJ-{last_id:06d}"
+            # A random token rather than a sequential counter: sequential order
+            # numbers are easy to guess, and the receipt-upload endpoint only
+            # requires knowing an order number plus its email to attach a file
+            # to that order, so predictable numbers make that easier to abuse.
+            for _ in range(10):
+                candidate = f"DJ-{secrets.token_hex(4).upper()}"
+                if not Order.objects.filter(order_number=candidate).exists():
+                    self.order_number = candidate
+                    break
+            else:
+                raise RuntimeError("Could not generate a unique order number.")
         super().save(*args, **kwargs)
 
     def __str__(self):

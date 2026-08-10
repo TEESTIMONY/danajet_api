@@ -1,8 +1,14 @@
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import ContactMessage, NewsletterSubscription, ProjectRequest, TransportWaitlist
-from .emails import queue_newsletter_welcome_email
+from .emails import (
+    queue_contact_message_notification,
+    queue_newsletter_welcome_email,
+    queue_project_request_notification,
+    queue_transport_waitlist_notification,
+)
 from .serializers import (
     ContactMessageSerializer,
     NewsletterSubscriptionSerializer,
@@ -19,10 +25,17 @@ class PublicCreateStaffManageViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    throttle_scope = "lead_form"
+
     def get_permissions(self):
         if self.action == "create":
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
+
+    def get_throttles(self):
+        if self.action == "create":
+            return [ScopedRateThrottle()]
+        return []
 
     def perform_create(self, serializer):
         if self.request.user and self.request.user.is_staff:
@@ -45,6 +58,10 @@ class ProjectRequestViewSet(PublicCreateStaffManageViewSet):
     search_fields = ["name", "email", "phone", "service", "book_title", "message"]
     ordering_fields = ["created_at", "updated_at", "status"]
 
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        queue_project_request_notification(serializer.instance.pk)
+
 
 class ContactMessageViewSet(PublicCreateStaffManageViewSet):
     queryset = ContactMessage.objects.all()
@@ -52,6 +69,10 @@ class ContactMessageViewSet(PublicCreateStaffManageViewSet):
     filterset_fields = ["status", "reason"]
     search_fields = ["name", "email", "phone", "subject", "reason", "message"]
     ordering_fields = ["created_at", "updated_at", "status"]
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        queue_contact_message_notification(serializer.instance.pk)
 
 
 class NewsletterSubscriptionViewSet(PublicCreateStaffManageViewSet):
@@ -88,3 +109,7 @@ class TransportWaitlistViewSet(PublicCreateStaffManageViewSet):
     filterset_fields = ["status", "city"]
     search_fields = ["name", "email", "phone", "city", "notes"]
     ordering_fields = ["created_at", "updated_at", "status"]
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        queue_transport_waitlist_notification(serializer.instance.pk)

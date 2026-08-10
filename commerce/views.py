@@ -1,7 +1,10 @@
+from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
+from .emails import queue_receipt_uploaded_email
 from .models import Cart, CartItem, Coupon, CourseEnrollment, Order, Payment, ShippingRate
 from .serializers import (
     AddCartItemSerializer,
@@ -30,6 +33,8 @@ class IsAdminOrOwner(permissions.BasePermission):
 class CartViewSet(viewsets.ModelViewSet):
     serializer_class = CartSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "cart_write"
     filterset_fields = ["status", "currency"]
     ordering_fields = ["created_at", "updated_at"]
 
@@ -83,6 +88,8 @@ class CartViewSet(viewsets.ModelViewSet):
 class CartItemViewSet(viewsets.ModelViewSet):
     serializer_class = CartItemSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "cart_write"
     filterset_fields = ["cart", "item_type", "product", "course"]
 
     def get_queryset(self):
@@ -98,6 +105,7 @@ class CartItemViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    throttle_scope = None
     filterset_fields = ["status", "payment_status", "email"]
     search_fields = ["order_number", "email", "first_name", "last_name"]
     ordering_fields = ["created_at", "updated_at", "total", "status"]
@@ -113,10 +121,43 @@ class OrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user if self.request.user.is_authenticated else None)
 
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.AllowAny],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="receipt_upload",
+        url_path="attach-receipt",
+    )
+    def attach_receipt(self, request):
+        order_number = str(request.data.get("order_number", "")).strip()
+        email = str(request.data.get("email", "")).strip().lower()
+        receipt = request.data.get("receipt")
+        if not order_number or not email:
+            return Response({"detail": "Order number and email are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not receipt:
+            return Response({"detail": "A receipt file is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        order = Order.objects.filter(order_number=order_number, email__iexact=email).first()
+        if not order:
+            return Response({"detail": "We could not find an order with that number and email."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(order, data={"receipt": receipt}, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        order.receipt_uploaded_at = timezone.now()
+        if order.payment_status == "unpaid":
+            order.payment_status = "pending"
+        order.save(update_fields=["receipt_uploaded_at", "payment_status", "updated_at"])
+        queue_receipt_uploaded_email(order.pk)
+        return Response(self.get_serializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
+
 
 class CheckoutViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     serializer_class = CheckoutSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "checkout"
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})
@@ -129,11 +170,19 @@ class CouponViewSet(viewsets.ModelViewSet):
     queryset = Coupon.objects.all()
     serializer_class = CouponSerializer
     permission_classes = [permissions.IsAdminUser]
+    throttle_scope = None
     filterset_fields = ["discount_type", "is_active"]
     search_fields = ["code"]
     ordering_fields = ["code", "amount", "created_at"]
 
-    @action(detail=False, methods=["post"], permission_classes=[permissions.AllowAny], url_path="validate")
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.AllowAny],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="coupon_validate",
+        url_path="validate",
+    )
     def validate_coupon(self, request):
         code = request.data.get("code", "")
         coupon = Coupon.objects.filter(code__iexact=code, is_active=True).first()

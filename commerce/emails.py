@@ -5,7 +5,8 @@ from threading import Thread
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
-from contacts.emails import _send_with_resend_api
+from contacts.emails import _send_with_resend_api, admin_notification_html, send_admin_notification
+from sitecontent.serializers import media_public_url
 
 from .models import Order
 
@@ -80,7 +81,7 @@ def send_order_emails(order_id):
 
         if settings.RESEND_API_KEY:
             _send_with_resend_api(customer_subject, customer_body, customer_html, order.email)
-            _send_with_resend_api(admin_subject, admin_body, admin_html, settings.ADMIN_EMAIL)
+            _send_with_resend_api(admin_subject, admin_body, admin_html, settings.ADMIN_NOTIFICATION_EMAILS)
         else:
             customer_message = EmailMultiAlternatives(
                 customer_subject,
@@ -93,7 +94,7 @@ def send_order_emails(order_id):
                 admin_subject,
                 admin_body,
                 settings.DEFAULT_FROM_EMAIL,
-                [settings.ADMIN_EMAIL],
+                settings.ADMIN_NOTIFICATION_EMAILS,
             )
             admin_message.attach_alternative(admin_html, "text/html")
             customer_message.send(fail_silently=False)
@@ -108,3 +109,31 @@ def queue_order_emails(order_id):
         return
 
     Thread(target=send_order_emails, args=(order_id,), daemon=True).start()
+
+
+def send_receipt_uploaded_email(order_id):
+    try:
+        order = Order.objects.get(pk=order_id)
+        receipt_link = media_public_url(order.receipt.name) if order.receipt else ""
+        summary = (
+            f"Order number: {order.order_number}\n"
+            f"Customer: {order.first_name} {order.last_name}\n"
+            f"Email: {order.email}\n"
+            f"Payment method: {order.get_payment_method_display()}\n"
+            f"Total: {order.display_currency} {order.display_total}\n"
+            f"Receipt: {receipt_link or 'Uploaded, view in the Danajet admin dashboard.'}"
+        )
+        subject = f"Receipt Uploaded - {order.order_number}"
+        text_body = f"A payment receipt was uploaded for an order awaiting confirmation.\n\n{summary}"
+        html_body = admin_notification_html("Receipt Uploaded", order.order_number, summary)
+        send_admin_notification(subject, text_body, html_body)
+    except Exception:
+        logger.exception("Receipt uploaded email could not be sent for order %s", order_id)
+
+
+def queue_receipt_uploaded_email(order_id):
+    if not getattr(settings, "ORDER_EMAIL_ASYNC", True):
+        send_receipt_uploaded_email(order_id)
+        return
+
+    Thread(target=send_receipt_uploaded_email, args=(order_id,), daemon=True).start()

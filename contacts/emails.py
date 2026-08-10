@@ -7,6 +7,8 @@ from urllib import request as urlrequest
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
+from .models import ContactMessage, ProjectRequest, TransportWaitlist
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,11 @@ def queue_free_resource_email(subscription, course):
 
 
 def _send_with_resend_api(subject, text_body, html_body, to_email):
+    to_list = to_email if isinstance(to_email, (list, tuple)) else [to_email]
     payload = json.dumps(
         {
             "from": settings.RESEND_FROM_EMAIL,
-            "to": [to_email],
+            "to": to_list,
             "subject": subject,
             "html": html_body,
             "text": text_body,
@@ -48,16 +51,42 @@ def _send_with_resend_api(subject, text_body, html_body, to_email):
     try:
         with urlrequest.urlopen(request, timeout=settings.EMAIL_TIMEOUT) as response:
             body = response.read().decode("utf-8", errors="replace")
-            logger.info("Newsletter welcome email sent to %s via Resend API: %s", to_email, body)
+            logger.info("Email sent to %s via Resend API: %s", to_list, body)
     except urlerror.HTTPError as error:
         body = error.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Resend API returned {error.code}: {body}") from error
 
 
 def _send_with_django_email(subject, text_body, html_body, to_email):
-    message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
+    to_list = to_email if isinstance(to_email, (list, tuple)) else [to_email]
+    message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, to_list)
     message.attach_alternative(html_body, "text/html")
     message.send(fail_silently=False)
+
+
+def admin_notification_html(eyebrow, heading, body_text):
+    from html import escape
+
+    return (
+        "<div style=\"margin:0;background:#f6f1e9;padding:28px 0;font-family:Arial,Helvetica,sans-serif;color:#171717;\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">"
+        "<tr><td align=\"center\" style=\"padding:0 18px;\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:620px;border-collapse:collapse;background:#11100e;color:#fff;\">"
+        "<tr><td style=\"padding:34px 34px 26px;border-bottom:1px solid #2e2a25;\">"
+        f"<p style=\"margin:0 0 18px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#ef450b;\">{escape(eyebrow)}</p>"
+        f"<h1 style=\"margin:0;font-size:30px;line-height:1.05;text-transform:uppercase;\">{escape(heading)}</h1>"
+        "</td></tr>"
+        "<tr><td style=\"padding:28px 34px 34px;\">"
+        f"<pre style=\"margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;color:#e8e1d7;\">{escape(body_text)}</pre>"
+        "</td></tr></table></td></tr></table></div>"
+    )
+
+
+def send_admin_notification(subject, text_body, html_body):
+    if settings.RESEND_API_KEY:
+        _send_with_resend_api(subject, text_body, html_body, settings.ADMIN_NOTIFICATION_EMAILS)
+    else:
+        _send_with_django_email(subject, text_body, html_body, settings.ADMIN_NOTIFICATION_EMAILS)
 
 
 def send_newsletter_welcome_email(subscription):
@@ -138,3 +167,73 @@ def send_free_resource_email(subscription, course):
             _send_with_django_email(subject, text_body, html_body, subscription.email)
     except Exception:
         logger.exception("Free resource email could not be sent to %s", subscription.email)
+
+
+def send_project_request_notification(request_id):
+    try:
+        entry = ProjectRequest.objects.get(pk=request_id)
+        summary = (
+            f"Name: {entry.name}\n"
+            f"Email: {entry.email}\n"
+            f"Phone: {entry.phone or 'Not provided'}\n"
+            f"Service: {entry.service or 'Not specified'}\n"
+            f"Budget: {entry.budget or 'Not specified'}\n"
+            f"Stage: {entry.stage or 'Not specified'}\n"
+            f"Timeline: {entry.timeline or 'Not specified'}\n"
+            f"Preferred contact: {entry.get_preferred_contact_method_display()}\n\n"
+            f"Message:\n{entry.message}"
+        )
+        subject = f"New Project Request - {entry.name}"
+        text_body = f"A new project request was submitted on the Danajet website.\n\n{summary}"
+        html_body = admin_notification_html("New Project Request", entry.name, summary)
+        send_admin_notification(subject, text_body, html_body)
+    except Exception:
+        logger.exception("Project request notification could not be sent for id %s", request_id)
+
+
+def queue_project_request_notification(request_id):
+    Thread(target=send_project_request_notification, args=(request_id,), daemon=True).start()
+
+
+def send_contact_message_notification(message_id):
+    try:
+        entry = ContactMessage.objects.get(pk=message_id)
+        summary = (
+            f"Name: {entry.name}\n"
+            f"Email: {entry.email}\n"
+            f"Phone: {entry.phone or 'Not provided'}\n"
+            f"Reason: {entry.reason or 'Not specified'}\n\n"
+            f"Message:\n{entry.message}"
+        )
+        subject = f"New Contact Message - {entry.name}"
+        text_body = f"A new contact message was submitted on the Danajet website.\n\n{summary}"
+        html_body = admin_notification_html("New Contact Message", entry.name, summary)
+        send_admin_notification(subject, text_body, html_body)
+    except Exception:
+        logger.exception("Contact message notification could not be sent for id %s", message_id)
+
+
+def queue_contact_message_notification(message_id):
+    Thread(target=send_contact_message_notification, args=(message_id,), daemon=True).start()
+
+
+def send_transport_waitlist_notification(entry_id):
+    try:
+        entry = TransportWaitlist.objects.get(pk=entry_id)
+        summary = (
+            f"Email: {entry.email}\n"
+            f"Name: {entry.name or 'Not provided'}\n"
+            f"Phone: {entry.phone or 'Not provided'}\n"
+            f"City: {entry.city or 'Not provided'}\n"
+            f"Notes: {entry.notes or 'None'}"
+        )
+        subject = f"New Transport Waitlist Signup - {entry.email}"
+        text_body = f"A new Danajet Transport waitlist signup was submitted.\n\n{summary}"
+        html_body = admin_notification_html("Transport Waitlist", entry.email, summary)
+        send_admin_notification(subject, text_body, html_body)
+    except Exception:
+        logger.exception("Transport waitlist notification could not be sent for id %s", entry_id)
+
+
+def queue_transport_waitlist_notification(entry_id):
+    Thread(target=send_transport_waitlist_notification, args=(entry_id,), daemon=True).start()

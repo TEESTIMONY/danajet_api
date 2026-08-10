@@ -14,6 +14,28 @@ def is_image_upload(file_obj):
     return content_type.startswith("image/")
 
 
+DANGEROUS_UPLOAD_EXTENSIONS = (".svg", ".html", ".htm", ".xhtml", ".mhtml", ".js", ".mjs", ".php", ".phtml")
+DANGEROUS_UPLOAD_CONTENT_TYPES = (
+    "text/html",
+    "application/xhtml+xml",
+    "image/svg+xml",
+    "application/javascript",
+    "text/javascript",
+)
+
+
+def reject_dangerous_upload(file_obj):
+    """Block script-capable file types (SVG, HTML, JS, ...) regardless of the
+    asset type the upload is attached to. The client-supplied content type is
+    not trustworthy on its own, so this also checks the filename extension."""
+    if not file_obj:
+        return
+    name = str(getattr(file_obj, "name", "")).lower()
+    content_type = getattr(file_obj, "content_type", "").lower()
+    if name.endswith(DANGEROUS_UPLOAD_EXTENSIONS) or content_type in DANGEROUS_UPLOAD_CONTENT_TYPES:
+        raise serializers.ValidationError("This file type is not allowed for security reasons.")
+
+
 def optimize_image_upload(file_obj):
     if not file_obj or not is_image_upload(file_obj):
         return file_obj
@@ -82,7 +104,10 @@ class MediaAssetSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def validate_file(self, value):
-        if value and value.size > settings.MEDIA_UPLOAD_MAX_BYTES:
+        if not value:
+            return value
+        reject_dangerous_upload(value)
+        if value.size > settings.MEDIA_UPLOAD_MAX_BYTES:
             raise serializers.ValidationError(f"Upload must be {settings.MEDIA_UPLOAD_MAX_MB}MB or smaller.")
         return optimize_image_upload(value)
 

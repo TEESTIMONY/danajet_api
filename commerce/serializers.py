@@ -1,10 +1,12 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework import serializers
 
 from catalog.models import Course, Product
 from catalog.serializers import CourseSerializer, ProductSerializer
+from sitecontent.serializers import is_image_upload, media_public_url, optimize_image_upload
 
 from .models import Cart, CartItem, Coupon, CourseEnrollment, Order, OrderItem, Payment, ShippingRate
 from .emails import queue_order_emails
@@ -87,11 +89,45 @@ class PaymentSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
+    receipt_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = "__all__"
-        read_only_fields = ["user", "order_number", "created_at", "updated_at"]
+        read_only_fields = ["user", "order_number", "created_at", "updated_at", "receipt_uploaded_at"]
+
+    def validate_receipt(self, value):
+        if not value:
+            return value
+        if value.size > settings.MEDIA_UPLOAD_MAX_BYTES:
+            raise serializers.ValidationError(f"Receipt must be {settings.MEDIA_UPLOAD_MAX_MB}MB or smaller.")
+
+        if is_image_upload(value):
+            optimized = optimize_image_upload(value)
+            # optimize_image_upload only re-encodes files Pillow can actually decode as an
+            # image; anything it could not decode (a mislabelled non-image, an SVG, a
+            # polyglot file, ...) comes back unchanged, so require the .webp result here
+            # instead of trusting the client-supplied content type.
+            if not str(getattr(optimized, "name", "")).lower().endswith(".webp"):
+                raise serializers.ValidationError("That file is not a valid image. Please upload a JPG, PNG, or PDF receipt.")
+            return optimized
+
+        value.seek(0)
+        header = value.read(5)
+        value.seek(0)
+        if header != b"%PDF-":
+            raise serializers.ValidationError("Receipts must be an image (JPG or PNG) or a PDF file.")
+        return value
+
+    def get_receipt_url(self, obj):
+        if not obj.receipt:
+            return ""
+        public_url = media_public_url(obj.receipt.name)
+        if public_url:
+            return public_url
+        request = self.context.get("request")
+        url = obj.receipt.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class CheckoutSerializer(serializers.Serializer):

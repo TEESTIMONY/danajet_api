@@ -1,11 +1,15 @@
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from rest_framework import serializers
 
 from .models import CustomerAddress, CustomerProfile
 
 
 User = get_user_model()
+
+LOGIN_LOCKOUT_THRESHOLD = 5
+LOGIN_LOCKOUT_WINDOW_SECONDS = 15 * 60
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -53,6 +57,15 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         email = attrs["email"].lower().strip()
+        # Locked per-account (not per-IP) so a distributed attack spread across
+        # many source IPs can't bypass the request-rate throttle on the view.
+        lockout_key = f"login-attempts:{email}"
+        attempts = cache.get(lockout_key, 0)
+        if attempts >= LOGIN_LOCKOUT_THRESHOLD:
+            raise serializers.ValidationError(
+                "Too many failed login attempts for this account. Please try again in a few minutes."
+            )
+
         user = User.objects.filter(email__iexact=email).first()
         username = user.get_username() if user else email
         authenticated_user = authenticate(
@@ -61,7 +74,10 @@ class LoginSerializer(serializers.Serializer):
             password=attrs["password"],
         )
         if not authenticated_user:
+            cache.set(lockout_key, attempts + 1, LOGIN_LOCKOUT_WINDOW_SECONDS)
             raise serializers.ValidationError("Invalid email or password.")
+
+        cache.delete(lockout_key)
         attrs["user"] = authenticated_user
         return attrs
 
