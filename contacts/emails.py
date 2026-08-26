@@ -25,17 +25,18 @@ def queue_free_resource_email(subscription, course):
     Thread(target=send_free_resource_email, args=(subscription, course), daemon=True).start()
 
 
-def _send_with_resend_api(subject, text_body, html_body, to_email):
+def _send_with_resend_api(subject, text_body, html_body, to_email, bcc=None):
     to_list = to_email if isinstance(to_email, (list, tuple)) else [to_email]
-    payload = json.dumps(
-        {
-            "from": settings.RESEND_FROM_EMAIL,
-            "to": to_list,
-            "subject": subject,
-            "html": html_body,
-            "text": text_body,
-        }
-    ).encode("utf-8")
+    payload_dict = {
+        "from": settings.RESEND_FROM_EMAIL,
+        "to": to_list,
+        "subject": subject,
+        "html": html_body,
+        "text": text_body,
+    }
+    if bcc:
+        payload_dict["bcc"] = bcc if isinstance(bcc, (list, tuple)) else [bcc]
+    payload = json.dumps(payload_dict).encode("utf-8")
     request = urlrequest.Request(
         settings.RESEND_API_URL,
         data=payload,
@@ -57,9 +58,10 @@ def _send_with_resend_api(subject, text_body, html_body, to_email):
         raise RuntimeError(f"Resend API returned {error.code}: {body}") from error
 
 
-def _send_with_django_email(subject, text_body, html_body, to_email):
+def _send_with_django_email(subject, text_body, html_body, to_email, bcc=None):
     to_list = to_email if isinstance(to_email, (list, tuple)) else [to_email]
-    message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, to_list)
+    bcc_list = (bcc if isinstance(bcc, (list, tuple)) else [bcc]) if bcc else None
+    message = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, to_list, bcc=bcc_list)
     message.attach_alternative(html_body, "text/html")
     message.send(fail_silently=False)
 
@@ -83,10 +85,15 @@ def admin_notification_html(eyebrow, heading, body_text):
 
 
 def send_admin_notification(subject, text_body, html_body):
+    # Recipients go in Bcc so admins don't see each other's addresses in the
+    # To: header. The visible To: is a single neutral address (excluded from
+    # Bcc to avoid it receiving a duplicate copy).
+    to_email = settings.DEFAULT_FROM_EMAIL
+    bcc = [email for email in settings.ADMIN_NOTIFICATION_EMAILS if email != to_email]
     if settings.RESEND_API_KEY:
-        _send_with_resend_api(subject, text_body, html_body, settings.ADMIN_NOTIFICATION_EMAILS)
+        _send_with_resend_api(subject, text_body, html_body, to_email, bcc=bcc)
     else:
-        _send_with_django_email(subject, text_body, html_body, settings.ADMIN_NOTIFICATION_EMAILS)
+        _send_with_django_email(subject, text_body, html_body, to_email, bcc=bcc)
 
 
 def send_newsletter_welcome_email(subscription):

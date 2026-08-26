@@ -81,7 +81,6 @@ def send_order_emails(order_id):
 
         if settings.RESEND_API_KEY:
             _send_with_resend_api(customer_subject, customer_body, customer_html, order.email)
-            _send_with_resend_api(admin_subject, admin_body, admin_html, settings.ADMIN_NOTIFICATION_EMAILS)
         else:
             customer_message = EmailMultiAlternatives(
                 customer_subject,
@@ -90,15 +89,10 @@ def send_order_emails(order_id):
                 [order.email],
             )
             customer_message.attach_alternative(customer_html, "text/html")
-            admin_message = EmailMultiAlternatives(
-                admin_subject,
-                admin_body,
-                settings.DEFAULT_FROM_EMAIL,
-                settings.ADMIN_NOTIFICATION_EMAILS,
-            )
-            admin_message.attach_alternative(admin_html, "text/html")
             customer_message.send(fail_silently=False)
-            admin_message.send(fail_silently=False)
+
+        # Bcc's the admin recipients so they don't see each other's addresses.
+        send_admin_notification(admin_subject, admin_body, admin_html)
     except Exception:
         logger.exception("Order emails could not be sent for order %s", order_id)
 
