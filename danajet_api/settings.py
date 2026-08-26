@@ -20,7 +20,7 @@ ADMIN_EMAIL = os.getenv("DJANGO_ADMIN_EMAIL", "hello@danajet.com")
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", ADMIN_EMAIL)
 ADMIN_NOTIFICATION_EMAILS = [
     email.strip()
-    for email in os.getenv("DJANGO_ADMIN_NOTIFICATION_EMAILS", f"{ADMIN_EMAIL},testimonyalade82@gmail.com").split(",")
+    for email in os.getenv("DJANGO_ADMIN_NOTIFICATION_EMAILS", f"{ADMIN_EMAIL},testimonyalade82@gmail.com,danajetgroup@gmail.com").split(",")
     if email.strip()
 ]
 ALLOWED_HOSTS = [
