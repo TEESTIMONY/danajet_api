@@ -23,6 +23,9 @@ ADMIN_NOTIFICATION_EMAILS = [
     for email in os.getenv("DJANGO_ADMIN_NOTIFICATION_EMAILS", f"{ADMIN_EMAIL},testimonyalade82@gmail.com,danajetgroup@gmail.com").split(",")
     if email.strip()
 ]
+# Visible To: address on admin notification emails; the rest of
+# ADMIN_NOTIFICATION_EMAILS are Bcc'd (see send_admin_notification).
+ADMIN_NOTIFICATION_TO_EMAIL = os.getenv("DJANGO_ADMIN_NOTIFICATION_TO_EMAIL", "danajetgroup@gmail.com")
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")

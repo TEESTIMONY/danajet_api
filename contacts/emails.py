@@ -88,7 +88,7 @@ def send_admin_notification(subject, text_body, html_body):
     # Recipients go in Bcc so admins don't see each other's addresses in the
     # To: header. The visible To: is a single neutral address (excluded from
     # Bcc to avoid it receiving a duplicate copy).
-    to_email = settings.DEFAULT_FROM_EMAIL
+    to_email = settings.ADMIN_NOTIFICATION_TO_EMAIL
     bcc = [email for email in settings.ADMIN_NOTIFICATION_EMAILS if email != to_email]
     if settings.RESEND_API_KEY:
         _send_with_resend_api(subject, text_body, html_body, to_email, bcc=bcc)
