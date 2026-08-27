@@ -113,6 +113,11 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", DEFAULT_FROM_EMAIL)
 RESEND_API_URL = os.getenv("RESEND_API_URL", "https://api.resend.com/emails")
 
+# Cloudflare Turnstile (bot protection for public lead forms). Verification is
+# skipped when no secret key is configured, so local dev keeps working without it.
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "")
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 WHITENOISE_AVAILABLE = find_spec("whitenoise") is not None

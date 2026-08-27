@@ -15,6 +15,7 @@ from .serializers import (
     ProjectRequestSerializer,
     TransportWaitlistSerializer,
 )
+from .turnstile import get_client_ip, verify_turnstile
 
 
 class PublicCreateStaffManageViewSet(
@@ -69,6 +70,19 @@ class ContactMessageViewSet(PublicCreateStaffManageViewSet):
     filterset_fields = ["status", "reason"]
     search_fields = ["name", "email", "phone", "subject", "reason", "message"]
     ordering_fields = ["created_at", "updated_at", "status"]
+
+    def create(self, request, *args, **kwargs):
+        # This endpoint has been targeted by contact-form spam bots; require a
+        # passing Turnstile token from anonymous submitters. No-op when
+        # TURNSTILE_SECRET_KEY isn't configured (see verify_turnstile).
+        if not (request.user and request.user.is_staff):
+            token = request.data.get("turnstile_token", "")
+            if not verify_turnstile(token, get_client_ip(request)):
+                return Response(
+                    {"detail": "Captcha verification failed. Please try again."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         super().perform_create(serializer)

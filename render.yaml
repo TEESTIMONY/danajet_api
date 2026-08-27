@@ -79,3 +79,5 @@ services:
         value: "1800"
       - key: MEDIA_IMAGE_QUALITY
         value: "82"
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
